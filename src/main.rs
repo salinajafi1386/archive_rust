@@ -3,6 +3,9 @@ use std::path::PathBuf;
 
 use clap::Parser;
 
+use pack::pack;
+use unpack::unpack;
+
 mod crypto;
 mod pack;
 mod unpack;
@@ -15,13 +18,13 @@ struct Cli {
 
 #[derive(Subcommand, Debug)]
 enum Commands {
-    pack {
+    Pack {
         #[arg(short, long)]
         password: Option<String>,
         files: Vec<PathBuf>,
     },
 
-    unpack {
+    Unpack {
         #[arg(short, long)]
         password: Option<String>,
         archive: PathBuf,
@@ -30,5 +33,13 @@ enum Commands {
 
 fn main() {
     let cli = Cli::parse();
-    println!("{:#?}", cli);
+
+    match &cli.command {
+        Commands::Pack { files, password } => {
+            pack(files.clone(), password.clone());
+        }
+        Commands::Unpack { archive, password } => {
+            unpack(archive.clone(), password.clone());
+        }
+    }
 }
