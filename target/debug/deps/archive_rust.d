@@ -6,3 +6,5 @@ src\main.rs:
 src\crypto.rs:
 src\pack.rs:
 src\unpack.rs:
+
+# env-dep:CARGO_PKG_NAME=archive_rust

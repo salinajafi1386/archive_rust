@@ -1,0 +1,1 @@
+E:\Code\MyRust\Projects\archive_rust\target\debug\archive_rust.exe: E:\Code\MyRust\Projects\archive_rust\src\crypto.rs E:\Code\MyRust\Projects\archive_rust\src\main.rs E:\Code\MyRust\Projects\archive_rust\src\pack.rs E:\Code\MyRust\Projects\archive_rust\src\unpack.rs
