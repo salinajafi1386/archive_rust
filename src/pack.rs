@@ -15,9 +15,17 @@ struct ArchiveHeader {
 }
 
 pub fn pack(files: Vec<PathBuf>, _password: Option<String>) -> Result<(), io::Error> {
-    let mut file_list = Vec::new();
+    check_files(&files)?;
 
-    for file_path in &files {
+    let header = create_archive_header(&files)?;
+
+    println!("{:#?}", header);
+
+    Ok(())
+}
+
+fn check_files(files: &[PathBuf]) -> Result<(), io::Error> {
+    for file_path in files {
         if !file_path.exists() {
             eprintln!("Error: File not found: {:#?}", file_path);
             return Err(io::Error::new(io::ErrorKind::NotFound, "File not found"));
@@ -30,7 +38,15 @@ pub fn pack(files: Vec<PathBuf>, _password: Option<String>) -> Result<(), io::Er
                 "Is a directory",
             ));
         }
+    }
 
+    Ok(())
+}
+
+fn create_archive_header(files: &[PathBuf]) -> Result<ArchiveHeader, io::Error> {
+    let mut file_list = Vec::new();
+
+    for file_path in files {
         let meta = match fs::metadata(file_path) {
             Ok(m) => m,
             Err(e) => return Err(e),
@@ -60,7 +76,5 @@ pub fn pack(files: Vec<PathBuf>, _password: Option<String>) -> Result<(), io::Er
         files: file_list,
     };
 
-    println!("Archive Header : \n {:#?}", header);
-
-    Ok(())
+    Ok(header)
 }
