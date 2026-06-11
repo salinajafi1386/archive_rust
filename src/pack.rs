@@ -1,4 +1,5 @@
 use std::fs;
+use std::fs::File;
 use std::io;
 use std::path::PathBuf;
 
@@ -14,12 +15,20 @@ struct ArchiveHeader {
     files: Vec<FileEntry>,
 }
 
-pub fn pack(files: Vec<PathBuf>, _password: Option<String>) -> Result<(), io::Error> {
+pub fn pack(
+    files: Vec<PathBuf>,
+    _password: Option<String>,
+    output_name: PathBuf,
+) -> Result<(), io::Error> {
     check_files(&files)?;
+
+    let output_name = validate_output_name(&output_name)?;
 
     let header = create_archive_header(&files)?;
 
     println!("{:#?}", header);
+
+    create_arch(&output_name)?;
 
     Ok(())
 }
@@ -77,4 +86,28 @@ fn create_archive_header(files: &[PathBuf]) -> Result<ArchiveHeader, io::Error> 
     };
 
     Ok(header)
+}
+
+fn validate_output_name(output_name: &PathBuf) -> Result<PathBuf, io::Error> {
+    match output_name.extension() {
+        Some(ext) => {
+            if ext.to_str() != Some("arch") {
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidInput,
+                    "Output file must use the .arch extension.",
+                ));
+            }
+            Ok(output_name.to_path_buf())
+        }
+        None => {
+            let mut fixed_name = output_name.to_path_buf();
+            fixed_name.set_extension("arch");
+            Ok(fixed_name)
+        }
+    }
+}
+
+fn create_arch(output_name: &PathBuf) -> Result<(), io::Error> {
+    let _file = File::create(output_name)?;
+    Ok(())
 }

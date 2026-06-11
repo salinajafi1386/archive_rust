@@ -20,7 +20,11 @@ struct Cli {
 enum Commands {
     Pack {
         #[arg(short, long)]
+        output: PathBuf,
+
+        #[arg(short, long)]
         password: Option<String>,
+
         files: Vec<PathBuf>,
     },
 
@@ -35,8 +39,12 @@ fn main() {
     let cli = Cli::parse();
 
     match &cli.command {
-        Commands::Pack { files, password } => {
-            pack(files.clone(), password.clone());
+        Commands::Pack {
+            files,
+            password,
+            output,
+        } => {
+            pack(files.clone(), password.clone(), output.clone());
         }
         Commands::Unpack { archive, password } => {
             unpack(archive.clone(), password.clone());
