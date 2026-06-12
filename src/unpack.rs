@@ -1,6 +1,7 @@
+use std::fs;
 use std::fs::File;
 use std::io;
-use std::io::Read;
+use std::io::{Read, Write};
 use std::path::PathBuf;
 
 #[derive(Debug)]
@@ -19,6 +20,8 @@ pub fn unpack(archive: PathBuf, _password: Option<String>) -> Result<(), io::Err
     check_archive_file(&archive)?;
 
     let header = read_header(&archive)?;
+
+    read_files(&archive, &header)?;
 
     println!("{:#?}", header);
 
@@ -80,4 +83,42 @@ fn read_header(archive: &PathBuf) -> Result<ArchiveHeader, io::Error> {
         file_count,
         files: file_list,
     })
+}
+
+fn read_files(archive: &PathBuf, header: &ArchiveHeader) -> Result<(), io::Error> {
+    fs::create_dir_all("output")?;
+
+    let mut file = File::open(archive)?;
+
+    let mut count_buffer = [0u8; 4];
+    file.read_exact(&mut count_buffer)?;
+
+    let file_count = u32::from_le_bytes(count_buffer);
+
+    for _ in 0..file_count {
+        let mut name_len_buffer = [0u8; 4];
+        file.read_exact(&mut name_len_buffer)?;
+
+        let name_len = u32::from_le_bytes(name_len_buffer);
+
+        let mut name_buffer = vec![0u8; name_len as usize];
+        file.read_exact(&mut name_buffer)?;
+
+        let mut size_buffer = [0u8; 8];
+        file.read_exact(&mut size_buffer)?;
+    }
+
+    for entry in &header.files {
+        let mut data = vec![0u8; entry.size as usize];
+
+        file.read_exact(&mut data)?;
+
+        let output_path = PathBuf::from("output").join(&entry.name);
+
+        let mut output_file = File::create(output_path)?;
+
+        output_file.write_all(&data)?;
+    }
+
+    Ok(())
 }
