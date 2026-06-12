@@ -2,7 +2,7 @@ use std::fs;
 use std::fs::File;
 use std::io;
 use std::io::BufWriter;
-use std::io::Write;
+use std::io::{Read, Write};
 use std::path::PathBuf;
 
 #[derive(Debug)]
@@ -33,6 +33,8 @@ pub fn pack(
     let mut writer = create_arch(&output_name)?;
 
     write_header(&mut writer, &header)?;
+
+    write_files_data(&files, &mut writer)?;
 
     Ok(())
 }
@@ -127,7 +129,21 @@ fn write_header(writer: &mut BufWriter<File>, header: &ArchiveHeader) -> Result<
 
         writer.write_all(&file.size.to_le_bytes())?;
     }
+    writer.flush()?;
 
+    Ok(())
+}
+
+fn write_files_data(files: &[PathBuf], writer: &mut BufWriter<File>) -> Result<(), io::Error> {
+    for file in files {
+        let mut data = Vec::new();
+
+        let mut opened_file = File::open(file)?;
+
+        opened_file.read_to_end(&mut data)?;
+
+        writer.write_all(&data)?;
+    }
     writer.flush()?;
 
     Ok(())
