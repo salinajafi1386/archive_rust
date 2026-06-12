@@ -62,10 +62,7 @@ fn create_archive_header(files: &[PathBuf]) -> Result<ArchiveHeader, io::Error> 
     let mut file_list = Vec::new();
 
     for file_path in files {
-        let meta = match fs::metadata(file_path) {
-            Ok(m) => m,
-            Err(e) => return Err(e),
-        };
+        let meta = fs::metadata(file_path)?;
 
         let size = meta.len();
         let file_name = match file_path.file_name() {
