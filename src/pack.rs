@@ -1,6 +1,8 @@
 use std::fs;
 use std::fs::File;
 use std::io;
+use std::io::BufWriter;
+use std::io::Write;
 use std::path::PathBuf;
 
 #[derive(Debug)]
@@ -28,7 +30,9 @@ pub fn pack(
 
     println!("{:#?}", header);
 
-    create_arch(&output_name)?;
+    let mut writer = create_arch(&output_name)?;
+
+    write_header(&mut writer, &header)?;
 
     Ok(())
 }
@@ -107,7 +111,24 @@ fn validate_output_name(output_name: &PathBuf) -> Result<PathBuf, io::Error> {
     }
 }
 
-fn create_arch(output_name: &PathBuf) -> Result<(), io::Error> {
-    let _file = File::create(output_name)?;
+fn create_arch(output_name: &PathBuf) -> Result<BufWriter<File>, io::Error> {
+    let file = File::create(output_name)?;
+    let writer = BufWriter::new(file);
+    Ok(writer)
+}
+
+fn write_header(writer: &mut BufWriter<File>, header: &ArchiveHeader) -> Result<(), io::Error> {
+    writer.write_all(&header.file_count.to_le_bytes())?;
+
+    for file in &header.files {
+        writer.write_all(&(file.name.len() as u32).to_le_bytes())?;
+
+        writer.write_all(file.name.as_bytes())?;
+
+        writer.write_all(&file.size.to_le_bytes())?;
+    }
+
+    writer.flush()?;
+
     Ok(())
 }
