@@ -5,6 +5,8 @@ use std::io::BufWriter;
 use std::io::{Read, Write};
 use std::path::PathBuf;
 
+use crate::crypto::xor_crypt;
+
 #[derive(Debug)]
 struct FileEntry {
     name: String,
@@ -19,7 +21,7 @@ struct ArchiveHeader {
 
 pub fn pack(
     files: Vec<PathBuf>,
-    _password: Option<String>,
+    password: Option<String>,
     output_name: PathBuf,
 ) -> Result<(), io::Error> {
     check_files(&files)?;
@@ -34,7 +36,7 @@ pub fn pack(
 
     write_header(&mut writer, &header)?;
 
-    write_files_data(&files, &mut writer)?;
+    write_files_data(&files, &mut writer, password)?;
 
     Ok(())
 }
@@ -131,13 +133,21 @@ fn write_header(writer: &mut BufWriter<File>, header: &ArchiveHeader) -> Result<
     Ok(())
 }
 
-fn write_files_data(files: &[PathBuf], writer: &mut BufWriter<File>) -> Result<(), io::Error> {
+fn write_files_data(
+    files: &[PathBuf],
+    writer: &mut BufWriter<File>,
+    password: Option<String>,
+) -> Result<(), io::Error> {
     for file in files {
         let mut data = Vec::new();
 
         let mut opened_file = File::open(file)?;
 
         opened_file.read_to_end(&mut data)?;
+
+        if let Some(password) = &password {
+            data = xor_crypt(&mut data, password);
+        }
 
         writer.write_all(&data)?;
     }

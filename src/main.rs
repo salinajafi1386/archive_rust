@@ -31,6 +31,7 @@ enum Commands {
     Unpack {
         #[arg(short, long)]
         password: Option<String>,
+
         archive: PathBuf,
     },
 }
