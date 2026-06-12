@@ -122,6 +122,8 @@ fn create_arch(output_name: &PathBuf) -> Result<BufWriter<File>, io::Error> {
 }
 
 fn write_header(writer: &mut BufWriter<File>, header: &ArchiveHeader) -> Result<(), io::Error> {
+    writer.write_all(b"ARCH")?;
+
     writer.write_all(&[header.encrypted as u8])?;
 
     writer.write_all(&header.file_count.to_le_bytes())?;

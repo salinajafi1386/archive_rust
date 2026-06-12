@@ -59,6 +59,16 @@ fn read_header(archive: &PathBuf) -> Result<ArchiveHeader, io::Error> {
 
     let mut file = File::open(archive)?;
 
+    let mut magic = [0u8; 4];
+    file.read_exact(&mut magic)?;
+
+    if &magic != b"ARCH" {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidData,
+            "Invalid archive format",
+        ));
+    }
+
     let mut encrypted_buffer = [0u8; 1];
     file.read_exact(&mut encrypted_buffer)?;
 
