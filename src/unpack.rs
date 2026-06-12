@@ -13,6 +13,7 @@ struct FileEntry {
 
 #[derive(Debug)]
 struct ArchiveHeader {
+    encrypted: bool,
     file_count: u32,
     files: Vec<FileEntry>,
 }
@@ -20,6 +21,14 @@ pub fn unpack(archive: PathBuf, password: Option<String>) -> Result<(), io::Erro
     check_archive_file(&archive)?;
 
     let header = read_header(&archive)?;
+
+    if header.encrypted && password.is_none() {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidInput,
+            "Archive is encrypted. Please provide a password.",
+        ));
+    }
+
     read_files(&archive, &header, password)?;
     println!("{:#?}", header);
 
@@ -47,6 +56,11 @@ fn read_header(archive: &PathBuf) -> Result<ArchiveHeader, io::Error> {
     let mut file_list = Vec::new();
 
     let mut file = File::open(archive)?;
+
+    let mut encrypted_buffer = [0u8; 1];
+    file.read_exact(&mut encrypted_buffer)?;
+
+    let encrypted = encrypted_buffer[0] != 0;
 
     let mut buffer = [0u8; 4];
 
@@ -79,6 +93,7 @@ fn read_header(archive: &PathBuf) -> Result<ArchiveHeader, io::Error> {
     }
 
     Ok(ArchiveHeader {
+        encrypted,
         file_count,
         files: file_list,
     })
@@ -92,6 +107,10 @@ fn read_files(
 
     let mut file = File::open(archive)?;
     let mut reader = BufReader::new(&mut file);
+
+    let mut encrypted_buffer = [0u8; 1];
+    reader.read_exact(&mut encrypted_buffer)?;
+
     let mut count_buffer = [0u8; 4];
     reader.read_exact(&mut count_buffer)?;
 

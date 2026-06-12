@@ -13,6 +13,7 @@ struct FileEntry {
 
 #[derive(Debug)]
 struct ArchiveHeader {
+    encrypted: bool,
     file_count: u32,
     files: Vec<FileEntry>,
 }
@@ -26,7 +27,7 @@ pub fn pack(
 
     let output_name = validate_output_name(&output_name)?;
 
-    let header = create_archive_header(&files)?;
+    let header = create_archive_header(&files, &password)?;
 
     println!("{:#?}", header);
 
@@ -58,7 +59,10 @@ fn check_files(files: &[PathBuf]) -> Result<(), io::Error> {
     Ok(())
 }
 
-fn create_archive_header(files: &[PathBuf]) -> Result<ArchiveHeader, io::Error> {
+fn create_archive_header(
+    files: &[PathBuf],
+    password: &Option<String>,
+) -> Result<ArchiveHeader, io::Error> {
     let mut file_list = Vec::new();
 
     for file_path in files {
@@ -84,6 +88,7 @@ fn create_archive_header(files: &[PathBuf]) -> Result<ArchiveHeader, io::Error> 
     }
 
     let header = ArchiveHeader {
+        encrypted: password.is_some(),
         file_count: file_list.len() as u32,
         files: file_list,
     };
@@ -117,17 +122,17 @@ fn create_arch(output_name: &PathBuf) -> Result<BufWriter<File>, io::Error> {
 }
 
 fn write_header(writer: &mut BufWriter<File>, header: &ArchiveHeader) -> Result<(), io::Error> {
+    writer.write_all(&[header.encrypted as u8])?;
+
     writer.write_all(&header.file_count.to_le_bytes())?;
 
     for file in &header.files {
         writer.write_all(&(file.name.len() as u32).to_le_bytes())?;
-
         writer.write_all(file.name.as_bytes())?;
-
         writer.write_all(&file.size.to_le_bytes())?;
     }
-    writer.flush()?;
 
+    writer.flush()?;
     Ok(())
 }
 

@@ -39,6 +39,7 @@ pub fn xor_stream<R: Read, W: Write>(
 
         writer.write_all(&buffer[..bytes_read])?;
     }
+    writer.flush()?;
 
     Ok(())
 }
