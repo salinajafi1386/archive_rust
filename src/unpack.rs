@@ -22,6 +22,8 @@ pub fn unpack(archive: PathBuf, password: Option<String>) -> Result<(), io::Erro
 
     let header = read_header(&archive)?;
 
+    check_password_requirement(&header, &password)?;
+
     if header.encrypted && password.is_none() {
         return Err(io::Error::new(
             io::ErrorKind::InvalidInput,
@@ -137,6 +139,20 @@ fn read_files(
         } else {
             std::io::copy(&mut limited_reader, &mut output_file)?;
         }
+    }
+
+    Ok(())
+}
+
+fn check_password_requirement(
+    header: &ArchiveHeader,
+    password: &Option<String>,
+) -> Result<(), io::Error> {
+    if header.encrypted && password.is_none() {
+        return Err(io::Error::new(
+            io::ErrorKind::PermissionDenied,
+            "This archive is encrypted. Please provide a password.",
+        ));
     }
 
     Ok(())
