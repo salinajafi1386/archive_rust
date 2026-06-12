@@ -45,10 +45,15 @@ fn main() {
             password,
             output,
         } => {
-            pack(files.clone(), password.clone(), output.clone());
+            if let Err(e) = pack(files.clone(), password.clone(), output.clone()) {
+                eprintln!("Error: {}", e);
+            }
         }
+
         Commands::Unpack { archive, password } => {
-            unpack(archive.clone(), password.clone());
+            if let Err(e) = unpack(archive.clone(), password.clone()) {
+                eprintln!("Error: {}", e);
+            }
         }
     }
 }

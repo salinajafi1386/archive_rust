@@ -110,6 +110,7 @@ fn read_header(archive: &PathBuf) -> Result<ArchiveHeader, io::Error> {
         files: file_list,
     })
 }
+
 fn read_files(
     archive: &PathBuf,
     header: &ArchiveHeader,
