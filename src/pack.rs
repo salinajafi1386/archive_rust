@@ -1,11 +1,9 @@
+use crate::crypto::xor_stream;
 use std::fs;
 use std::fs::File;
 use std::io;
-use std::io::BufWriter;
-use std::io::{Read, Write};
+use std::io::{BufReader, BufWriter, Write};
 use std::path::PathBuf;
-
-use crate::crypto::xor_crypt;
 
 #[derive(Debug)]
 struct FileEntry {
@@ -65,8 +63,8 @@ fn create_archive_header(files: &[PathBuf]) -> Result<ArchiveHeader, io::Error> 
 
     for file_path in files {
         let meta = fs::metadata(file_path)?;
-
         let size = meta.len();
+
         let file_name = match file_path.file_name() {
             Some(name) => name.to_string_lossy().into_owned(),
             None => {
@@ -138,18 +136,14 @@ fn write_files_data(
     writer: &mut BufWriter<File>,
     password: Option<String>,
 ) -> Result<(), io::Error> {
-    for file in files {
-        let mut data = Vec::new();
-
-        let mut opened_file = File::open(file)?;
-
-        opened_file.read_to_end(&mut data)?;
-
-        if let Some(password) = &password {
-            data = xor_crypt(&mut data, password);
+    for file_path in files {
+        let input_file = File::open(file_path)?;
+        let mut reader = BufReader::new(input_file);
+        if let Some(pass) = &password {
+            xor_stream(&mut reader, &mut *writer, pass)?;
+        } else {
+            std::io::copy(&mut reader, &mut *writer)?;
         }
-
-        writer.write_all(&data)?;
     }
     writer.flush()?;
 
