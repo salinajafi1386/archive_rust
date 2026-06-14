@@ -10,13 +10,13 @@ mod crypto;
 mod pack;
 mod unpack;
 
-#[derive(Parser, Debug)]
+#[derive(Parser)]
 struct Cli {
     #[command(subcommand)]
     command: Commands,
 }
 
-#[derive(Subcommand, Debug)]
+#[derive(Subcommand)]
 enum Commands {
     Pack {
         #[arg(short, long)]

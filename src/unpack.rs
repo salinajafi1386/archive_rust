@@ -2,59 +2,64 @@ use crate::crypto::xor_stream;
 use std::fs;
 use std::fs::File;
 use std::io;
-use std::io::{BufReader, Read};
+use std::io::{BufReader, Error, ErrorKind, Read};
 use std::path::PathBuf;
 
-#[derive(Debug)]
 struct FileEntry {
     name: String,
     size: u64,
 }
 
-#[derive(Debug)]
 struct ArchiveHeader {
     encrypted: bool,
-    file_count: u32,
     files: Vec<FileEntry>,
 }
-pub fn unpack(archive: PathBuf, password: Option<String>) -> Result<(), io::Error> {
+
+pub fn unpack(archive: PathBuf, password: Option<String>) -> Result<(), Error> {
     check_archive_file(&archive)?;
+
+    println!("Extracting archive {} ...", archive.display());
 
     let header = read_header(&archive)?;
 
     check_password_requirement(&header, &password)?;
 
-    if header.encrypted && password.is_none() {
-        return Err(io::Error::new(
-            io::ErrorKind::InvalidInput,
-            "Archive is encrypted. Please provide a password.",
-        ));
+    read_files(&archive, &header, password)?;
+
+    print!("Unpacked files: ");
+
+    for (i, file) in header.files.iter().enumerate() {
+        if i > 0 {
+            print!(", ");
+        }
+
+        print!("{}", file.name);
     }
 
-    read_files(&archive, &header, password)?;
-    println!("{:#?}", header);
+    println!();
 
     Ok(())
 }
 
-fn check_archive_file(archive: &PathBuf) -> Result<(), io::Error> {
+fn check_archive_file(archive: &PathBuf) -> Result<(), Error> {
     if !archive.exists() {
-        eprintln!("Error: File not found: {:#?}", &archive);
-        return Err(io::Error::new(io::ErrorKind::NotFound, "File not found"));
+        return Err(Error::new(
+            ErrorKind::NotFound,
+            format!("File not found: {:?}", archive),
+        ));
     }
 
     if !archive.is_file() {
-        eprintln!("Error: Archive path is a directory: {:#?}", archive);
-        return Err(io::Error::new(
-            io::ErrorKind::InvalidInput,
-            "Is a directory",
+        return Err(Error::new(
+            ErrorKind::InvalidInput,
+            format!("Archive path is a directory: {:?}", archive),
         ));
     }
 
     Ok(())
 }
 
-fn read_header(archive: &PathBuf) -> Result<ArchiveHeader, io::Error> {
+fn read_header(archive: &PathBuf) -> Result<ArchiveHeader, Error> {
     let mut file_list = Vec::new();
 
     let mut file = File::open(archive)?;
@@ -63,10 +68,7 @@ fn read_header(archive: &PathBuf) -> Result<ArchiveHeader, io::Error> {
     file.read_exact(&mut magic)?;
 
     if &magic != b"ARCH" {
-        return Err(io::Error::new(
-            io::ErrorKind::InvalidData,
-            "Invalid archive format",
-        ));
+        return Err(Error::new(ErrorKind::InvalidData, "Invalid archive format"));
     }
 
     let mut encrypted_buffer = [0u8; 1];
@@ -89,9 +91,8 @@ fn read_header(archive: &PathBuf) -> Result<ArchiveHeader, io::Error> {
         let mut name_buffer = vec![0u8; name_len as usize];
         file.read_exact(&mut name_buffer)?;
 
-        let name = String::from_utf8(name_buffer).map_err(|_| {
-            io::Error::new(io::ErrorKind::InvalidData, "Invalid UTF-8 in file name")
-        })?;
+        let name = String::from_utf8(name_buffer)
+            .map_err(|_| Error::new(ErrorKind::InvalidData, "Invalid UTF-8 in file name"))?;
 
         let mut file_size_buffer = [0u8; 8];
         file.read_exact(&mut file_size_buffer)?;
@@ -106,7 +107,6 @@ fn read_header(archive: &PathBuf) -> Result<ArchiveHeader, io::Error> {
 
     Ok(ArchiveHeader {
         encrypted,
-        file_count,
         files: file_list,
     })
 }
@@ -115,11 +115,18 @@ fn read_files(
     archive: &PathBuf,
     header: &ArchiveHeader,
     password: Option<String>,
-) -> Result<(), io::Error> {
+) -> Result<(), Error> {
     fs::create_dir_all("output")?;
 
     let mut file = File::open(archive)?;
     let mut reader = BufReader::new(&mut file);
+
+    let mut magic = [0u8; 4];
+    reader.read_exact(&mut magic)?;
+
+    if &magic != b"ARCH" {
+        return Err(Error::new(ErrorKind::InvalidData, "Invalid archive format"));
+    }
 
     let mut encrypted_buffer = [0u8; 1];
     reader.read_exact(&mut encrypted_buffer)?;
@@ -145,10 +152,12 @@ fn read_files(
 
         let mut output_file = File::create(output_path)?;
         let mut limited_reader = reader.by_ref().take(entry.size);
-        if let Some(pass) = &password {
-            xor_stream(limited_reader, output_file, pass)?;
+
+        if header.encrypted {
+            let pass = password.as_ref().unwrap();
+            xor_stream(&mut limited_reader, &mut output_file, pass)?;
         } else {
-            std::io::copy(&mut limited_reader, &mut output_file)?;
+            io::copy(&mut limited_reader, &mut output_file)?;
         }
     }
 
@@ -158,10 +167,10 @@ fn read_files(
 fn check_password_requirement(
     header: &ArchiveHeader,
     password: &Option<String>,
-) -> Result<(), io::Error> {
+) -> Result<(), Error> {
     if header.encrypted && password.is_none() {
-        return Err(io::Error::new(
-            io::ErrorKind::PermissionDenied,
+        return Err(Error::new(
+            ErrorKind::PermissionDenied,
             "This archive is encrypted. Please provide a password.",
         ));
     }

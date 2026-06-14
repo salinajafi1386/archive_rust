@@ -2,16 +2,14 @@ use crate::crypto::xor_stream;
 use std::fs;
 use std::fs::File;
 use std::io;
-use std::io::{BufReader, BufWriter, Write};
+use std::io::{BufReader, BufWriter, Error, ErrorKind, Write};
 use std::path::PathBuf;
 
-#[derive(Debug)]
 struct FileEntry {
     name: String,
     size: u64,
 }
 
-#[derive(Debug)]
 struct ArchiveHeader {
     encrypted: bool,
     file_count: u32,
@@ -22,14 +20,18 @@ pub fn pack(
     files: Vec<PathBuf>,
     password: Option<String>,
     output_name: PathBuf,
-) -> Result<(), io::Error> {
+) -> Result<(), Error> {
     check_files(&files)?;
 
     let output_name = validate_output_name(&output_name)?;
 
-    let header = create_archive_header(&files, &password)?;
+    if password.is_some() {
+        println!("Creating encrypted archive {} ...", output_name.display());
+    } else {
+        println!("Creating archive {} ...", output_name.display());
+    }
 
-    println!("{:#?}", header);
+    let header = create_archive_header(&files, &password)?;
 
     let mut writer = create_arch(&output_name)?;
 
@@ -37,21 +39,24 @@ pub fn pack(
 
     write_files_data(&files, &mut writer, password)?;
 
+    println!("Packed {} files successfully.", files.len());
+
     Ok(())
 }
 
 fn check_files(files: &[PathBuf]) -> Result<(), io::Error> {
     for file_path in files {
         if !file_path.exists() {
-            eprintln!("Error: File not found: {:#?}", file_path);
-            return Err(io::Error::new(io::ErrorKind::NotFound, "File not found"));
+            return Err(io::Error::new(
+                ErrorKind::NotFound,
+                format!("File not found: {:?}", file_path),
+            ));
         }
 
         if !file_path.is_file() {
-            eprintln!("Error: Path is a directory, not a file: {:#?}", file_path);
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidInput,
-                "Is a directory",
+            return Err(Error::new(
+                ErrorKind::InvalidInput,
+                format!("Error: Path is a directory, not a file: {:?}", file_path),
             ));
         }
     }
@@ -62,7 +67,7 @@ fn check_files(files: &[PathBuf]) -> Result<(), io::Error> {
 fn create_archive_header(
     files: &[PathBuf],
     password: &Option<String>,
-) -> Result<ArchiveHeader, io::Error> {
+) -> Result<ArchiveHeader, Error> {
     let mut file_list = Vec::new();
 
     for file_path in files {
@@ -72,8 +77,8 @@ fn create_archive_header(
         let file_name = match file_path.file_name() {
             Some(name) => name.to_string_lossy().into_owned(),
             None => {
-                return Err(io::Error::new(
-                    io::ErrorKind::InvalidData,
+                return Err(Error::new(
+                    ErrorKind::InvalidData,
                     "Could not determine file name",
                 ));
             }
@@ -96,12 +101,12 @@ fn create_archive_header(
     Ok(header)
 }
 
-fn validate_output_name(output_name: &PathBuf) -> Result<PathBuf, io::Error> {
+fn validate_output_name(output_name: &PathBuf) -> Result<PathBuf, Error> {
     match output_name.extension() {
         Some(ext) => {
             if ext.to_str() != Some("arch") {
-                return Err(io::Error::new(
-                    io::ErrorKind::InvalidInput,
+                return Err(Error::new(
+                    ErrorKind::InvalidInput,
                     "Output file must use the .arch extension.",
                 ));
             }
@@ -115,13 +120,13 @@ fn validate_output_name(output_name: &PathBuf) -> Result<PathBuf, io::Error> {
     }
 }
 
-fn create_arch(output_name: &PathBuf) -> Result<BufWriter<File>, io::Error> {
+fn create_arch(output_name: &PathBuf) -> Result<BufWriter<File>, Error> {
     let file = File::create(output_name)?;
     let writer = BufWriter::new(file);
     Ok(writer)
 }
 
-fn write_header(writer: &mut BufWriter<File>, header: &ArchiveHeader) -> Result<(), io::Error> {
+fn write_header(writer: &mut BufWriter<File>, header: &ArchiveHeader) -> Result<(), Error> {
     writer.write_all(b"ARCH")?;
 
     writer.write_all(&[header.encrypted as u8])?;
@@ -142,14 +147,14 @@ fn write_files_data(
     files: &[PathBuf],
     writer: &mut BufWriter<File>,
     password: Option<String>,
-) -> Result<(), io::Error> {
+) -> Result<(), Error> {
     for file_path in files {
         let input_file = File::open(file_path)?;
         let mut reader = BufReader::new(input_file);
         if let Some(pass) = &password {
             xor_stream(&mut reader, &mut *writer, pass)?;
         } else {
-            std::io::copy(&mut reader, &mut *writer)?;
+            io::copy(&mut reader, &mut *writer)?;
         }
     }
     writer.flush()?;
